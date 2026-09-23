@@ -34,13 +34,18 @@ java -jar target/intersection-watchdog.jar
 
 Listens on port `7024`.
 
-## Test
+## Endpoints
 
-No automated tests yet. Manually verify it's up:
+| Endpoint | Response |
+|---|---|
+| `GET /health` | `OK` |
+| `GET /alert` | `{"alert": true/false, "secondsSinceLastHeartbeat": n, "alertAfterSeconds": 15, ...}` |
 
-```
-curl http://localhost:7024/health   # -> OK
-```
+## Behaviour
+
+- `HeartbeatMonitor` consumes `intersection-heartbeat-queue` and timestamps every heartbeat received.
+- `GET /alert` reports `alert: true` when no heartbeat has ever been seen or the last one is older than 15s; a background check also logs an `ALERT` line to stderr every 5s while the heartbeat is stale.
+- Killing intersection-service therefore surfaces within ~15-20s (heartbeat interval is 5s), both in the logs and on `/alert`.
 
 To add real tests, add JUnit 5 + the Surefire plugin to `pom.xml`, put tests under
 `src/test/java/co/wethinkcode/trafficflow/`, and run `mvn test`.
