@@ -72,8 +72,7 @@ watching the topic in the web console.
 
 ## TODO
 
-- Add `activemq-client` publish logic to `congestion-service` on its stage/state-change endpoint.
-- Add `activemq-client` subscriber logic to consumer service(s) above, replacing any
-  direct synchronous calls to `congestion-service`.
-- Add `activemq-client` heartbeat-publish logic to `intersection-service`.
-- Add `activemq-client` subscriber/alerting logic to `intersection-watchdog`.
+- [x] `activemq-client` publish logic in `congestion-service` on its level-change endpoint (`CongestionPublisher`)
+- [x] `activemq-client` subscriber logic in `routing-service`, replacing direct synchronous calls to `congestion-service` (`CongestionTopicSubscriber`, with REST polling kept as a fallback until the first message arrives)
+- [x] `activemq-client` heartbeat-publish logic in `intersection-service` (`HeartbeatPublisher`, every 5s)
+- [x] `activemq-client` subscriber/alerting logic in `intersection-watchdog` (`HeartbeatMonitor` + `GET /alert`)
