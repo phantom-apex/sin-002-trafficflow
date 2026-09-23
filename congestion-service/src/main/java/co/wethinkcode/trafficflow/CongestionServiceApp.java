@@ -16,13 +16,24 @@ public class CongestionServiceApp {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     public static void main(String[] args) {
+        CongestionPublisher publisher = null;
+        try {
+            publisher = new CongestionPublisher();
+        } catch (IllegalStateException e) {
+            System.err.println("[congestion-service] " + e.getMessage()
+                    + " — running without topic publishing until restart");
+        }
+
         Javalin app = Javalin.create().start(7022);
 
         app.get("/health", ctx -> ctx.result("OK"));
 
         app.get("/congestion", ctx -> ctx.json(Map.of("level", LEVEL.get())));
 
-        // Control-plane entry point: set the current city-wide level.
+        // Control-plane entry point: set the current city-wide level. Every
+        // accepted change is announced on the congestion-topic so consumers
+        // hear about it without polling (see common/README.md).
+        CongestionPublisher mq = publisher;
         app.post("/congestion", ctx -> {
             int requested;
             try {
@@ -43,6 +54,9 @@ public class CongestionServiceApp {
                 return;
             }
             LEVEL.set(requested);
+            if (mq != null) {
+                mq.publish(requested);
+            }
             ctx.json(Map.of("level", requested));
         });
     }
