@@ -15,6 +15,15 @@ public class IntersectionServiceApp {
         System.out.println("[intersection-service] loaded " + canonical.all().size()
                 + " canonical intersections from ingestion-service");
 
+        // Stage 4: announce liveness on the heartbeat queue so the watchdog
+        // can raise the alarm when this service dies.
+        try {
+            new HeartbeatPublisher().start();
+        } catch (IllegalStateException e) {
+            System.err.println("[intersection-service] " + e.getMessage()
+                    + " — running without heartbeats until restart");
+        }
+
         Javalin app = Javalin.create().start(7021);
 
         app.get("/health", ctx -> ctx.result(canonical.isLoaded() ? "OK" : "DEGRADED"));
