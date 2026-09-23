@@ -88,15 +88,32 @@ mvn package
 java -jar target/ingestion-service.jar
 ```
 
-Listens on port `7020`. Currently just exposes `/health` — the actual CSV
-parsing/cleaning logic is a TODO.
+Listens on port `7020`.
+
+## Endpoints
+
+| Endpoint | Response |
+|---|---|
+| `GET /health` | `OK` |
+| `GET /intersections` | `200` + JSON array of cleaned records |
+| `GET /intersections/{id}` | `200` with the record, `404` if unknown (id lookup is case-insensitive) |
+
+## Cleaning rules applied
+
+- Whitespace: trims ends, collapses double spaces (`" Down  town "` → `"Down town"`→ title-cased)
+- Casing: ids uppercased (`int-1005` → `INT-1005`), districts title-cased (`downtown` → `Downtown`), signal types lowercased (`4-Way` → `4-way`)
+- Booleans: `Y`/`yes`/`1`/`true` → `true`, `N`/`no`/`0`/`false` → `false`
+- Missing/placeholder (`blank`, `N/A`, `-`, `unknown`, `TBD`, `NaN`) → explicit JSON `null` — kept, never dropped or guessed
+- Duplicates: rows with the same normalized id are collapsed, first non-null value per field wins
+
+The cleaning logic lives in `IntersectionCleaner` (pure, unit-tested) and
+`CsvIntersectionLoader` (CSV + de-duplication); `IngestionServiceApp` only wires
+it to HTTP.
 
 ## Test
 
-No automated tests yet. Manually verify it's up:
-
 ```
-curl http://localhost:7020/health   # -> OK
+mvn test
 ```
 
 To add real tests, add JUnit 5 + the Surefire plugin to `pom.xml`, put tests under
