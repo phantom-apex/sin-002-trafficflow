@@ -13,7 +13,7 @@ public class IntersectionWatchdogApp {
     static final long ALERT_AFTER_SECONDS = 15;
 
     public static void main(String[] args) {
-        HeartbeatMonitor monitor = new HeartbeatMonitor();
+        HeartbeatMonitor monitor = createMonitor();
 
         ScheduledExecutorService alertChecks = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread thread = new Thread(r, "alert-checker");
@@ -47,5 +47,25 @@ public class IntersectionWatchdogApp {
                     + (secondsSince < 0 ? "any known period (never seen)" : secondsSince + "s")
                     + " — routes can no longer be validated");
         }
+    }
+
+    /** Retries the broker connection a few times — the broker may still be starting. */
+    private static HeartbeatMonitor createMonitor() {
+        IllegalStateException lastFailure = null;
+        for (int attempt = 1; attempt <= 5; attempt++) {
+            try {
+                return new HeartbeatMonitor();
+            } catch (IllegalStateException e) {
+                lastFailure = e;
+                System.err.println("[intersection-watchdog] waiting for broker (attempt " + attempt + ")");
+                try {
+                    Thread.sleep(3000);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+        throw lastFailure;
     }
 }
