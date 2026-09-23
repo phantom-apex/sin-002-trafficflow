@@ -28,8 +28,9 @@ cleanup through synchronous REST calls to asynchronous MQ decoupling and alertin
 Plus [`common/`](common) (no port) — the shared ActiveMQ broker and MQ config notes
 for `congestion-topic`: Routing Service becomes aware of congestion changes via an ActiveMQ Topic instead of querying Congestion Service directly.
 
-**Status:** scaffold only — build files, Javalin bootstrap, and TODOs are in place; no
-business logic has been implemented yet.
+**Status:** all four stages implemented — CSV cleaning (with tests), REST wiring
+across the domain services, `congestion-topic` pub/sub decoupling, and
+heartbeat-based watchdog alerting.
 
 ## Your task
 
@@ -129,10 +130,35 @@ cd intersection-watchdog && mvn package && java -jar target/intersection-watchdo
 | RoutingServiceApp (`routing-service`) | 7023 |
 | IntersectionWatchdogApp (`intersection-watchdog`) | 7024 |
 
+## Design notes
+
+The stage-by-stage structure mirrors the integration patterns catalogued on
+[microservices.io](https://microservices.io) and Martin Fowler's
+[event-driven architecture write-up](https://martinfowler.com/articles/201701-event-driven.html):
+
+- Stage 2 is deliberate **point-to-point coupling**: routing-service polls
+  congestion-service per request (the thing microservices.io calls the problem
+  with synchronous REST for state propagation).
+- Stage 3 swaps that poll for **pub/sub messaging** — congestion-service announces
+  level changes on `congestion-topic` and routing-service keeps the latest value
+  locally (event notification, not event-carried state transfer — the message is
+  small, so consumers don't need more data than the level itself).
+- Stage 4 is a **health-check/heartbeat** watch: instead of polling
+  intersection-service's `/health`, the watchdog listens to the
+  `intersection-heartbeat-queue` and alerts when heartbeats stop (the
+  *absence* of messages is the signal).
+
 ## Test
 
-No automated tests exist yet (this is a scaffold). Each running service exposes
-`/health`, so sanity-check manually:
+`ingestion-service` and `routing-service` carry JUnit 5 tests over their pure
+logic (cleaning rules, travel-time estimator):
+
+```
+cd ingestion-service && mvn test
+cd routing-service && mvn test
+```
+
+Each running service also exposes `/health`, so sanity-check manually:
 
 ```
 curl http://localhost:7020/health   # -> OK
