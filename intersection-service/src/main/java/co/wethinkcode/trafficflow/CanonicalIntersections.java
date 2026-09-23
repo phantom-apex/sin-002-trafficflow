@@ -23,33 +23,49 @@ public final class CanonicalIntersections {
     }
 
     /**
-     * Fetches the cleaned records from ingestion-service. Returns an empty
-     * holder when ingestion is unreachable so the service still boots (its
+     * Fetches the cleaned records from ingestion-service, retrying for a while
+     * since services may boot in any order. Returns an empty holder when
+     * ingestion stays unreachable so the service still boots (its
      * {@link #isLoaded()} flag lets callers/reporting see the gap).
      */
     public static CanonicalIntersections fetchFrom(String ingestionBaseUrl) {
         HttpClient client = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(5))
+                .connectTimeout(Duration.ofSeconds(3))
                 .build();
-        try {
-            HttpRequest request = HttpRequest.newBuilder(URI.create(ingestionBaseUrl + "/intersections"))
-                    .timeout(Duration.ofSeconds(10))
-                    .GET()
-                    .build();
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) {
-                throw new IllegalStateException("ingestion-service returned " + response.statusCode());
+        for (int attempt = 1; attempt <= 15; attempt++) {
+            try {
+                HttpRequest request = HttpRequest.newBuilder(URI.create(ingestionBaseUrl + "/intersections"))
+                        .timeout(Duration.ofSeconds(5))
+                        .GET()
+                        .build();
+                HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+                if (response.statusCode() != 200) {
+                    throw new IllegalStateException("ingestion-service returned " + response.statusCode());
+                }
+                List<IntersectionRecord> parsed = new ObjectMapper().readValue(
+                        response.body(),
+                        new com.fasterxml.jackson.core.type.TypeReference<List<IntersectionRecord>>() {
+                        });
+                return new CanonicalIntersections(parsed);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            } catch (Exception e) {
+                if (attempt == 1 || attempt % 5 == 0) {
+                    System.err.println("[intersection-service] waiting for ingestion-service (attempt "
+                            + attempt + "): " + e.getMessage());
+                }
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
             }
-            List<IntersectionRecord> parsed = new ObjectMapper().readValue(
-                    response.body(),
-                    new com.fasterxml.jackson.core.type.TypeReference<List<IntersectionRecord>>() {
-                    });
-            return new CanonicalIntersections(parsed);
-        } catch (Exception e) {
-            System.err.println("[intersection-service] could not load canonical list from "
-                    + ingestionBaseUrl + ": " + e.getMessage());
-            return new CanonicalIntersections(List.of());
         }
+        System.err.println("[intersection-service] giving up on ingestion-service at "
+                + ingestionBaseUrl + " — serving an empty canonical list (health will read DEGRADED)");
+        return new CanonicalIntersections(List.of());
     }
 
     public boolean isLoaded() {
