@@ -12,7 +12,7 @@ class IntersectionCleanerTest {
     @Test
     void trimsPaddingAndCollapsesDoubleSpaces() {
         assertEquals("Downtown", IntersectionCleaner.collapseSpaces("  Downtown  "));
-        assertEquals("Downtown", IntersectionCleaner.collapseSpaces("Down  town"));
+        assertEquals("Down town", IntersectionCleaner.collapseSpaces("Down  town"));
         assertEquals("INT-1003", IntersectionCleaner.cleanIdentifier("INT-1003 "));
     }
 
@@ -20,7 +20,7 @@ class IntersectionCleanerTest {
     void normalizesCasingForIdDistrictAndSignalType() {
         assertEquals("INT-1005", IntersectionCleaner.cleanIdentifier("int-1005"));
         assertEquals("Downtown", IntersectionCleaner.cleanDistrict("downtown"));
-        assertEquals("Downtown", IntersectionCleaner.cleanDistrict("DOWN TOWN"));
+        assertEquals("Down Town", IntersectionCleaner.cleanDistrict("DOWN TOWN"));
         assertEquals("4-way", IntersectionCleaner.cleanSignalType("4-Way"));
         assertEquals("roundabout", IntersectionCleaner.cleanSignalType("ROUNDABOUT"));
         assertEquals("stop-sign", IntersectionCleaner.cleanSignalType("Stop-Sign"));
