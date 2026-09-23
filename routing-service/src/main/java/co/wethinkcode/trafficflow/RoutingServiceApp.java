@@ -16,6 +16,17 @@ public class RoutingServiceApp {
         IntersectionClient intersections = new IntersectionClient(INTERSECTION_URL);
         CongestionClient congestion = new CongestionClient(CONGESTION_URL);
 
+        // Stage 3: congestion changes arrive on the congestion-topic instead of
+        // being polled per request. The REST client stays as a fallback for the
+        // window before the first topic message arrives.
+        CongestionTopicSubscriber subscriber = null;
+        try {
+            subscriber = new CongestionTopicSubscriber();
+        } catch (IllegalStateException e) {
+            System.err.println("[routing-service] " + e.getMessage()
+                    + " — falling back to REST polling of congestion-service");
+        }
+
         Javalin app = Javalin.create().start(7023);
 
         app.get("/health", ctx -> ctx.result("OK"));
@@ -38,7 +49,10 @@ public class RoutingServiceApp {
             try {
                 start = intersections.get(from);
                 end = intersections.get(to);
-                level = congestion.getLevel();
+                int topicLevel = subscriber != null ? subscriber.latestLevel() : CongestionTopicSubscriber.NO_LEVEL_YET;
+                level = topicLevel != CongestionTopicSubscriber.NO_LEVEL_YET
+                        ? topicLevel
+                        : congestion.getLevel();
             } catch (IllegalStateException e) {
                 ctx.status(HttpStatus.BAD_GATEWAY)
                         .json(Map.of("error", "Upstream dependency unavailable: " + e.getMessage()));
