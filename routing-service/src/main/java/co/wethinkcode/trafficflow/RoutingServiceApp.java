@@ -19,13 +19,7 @@ public class RoutingServiceApp {
         // Stage 3: congestion changes arrive on the congestion-topic instead of
         // being polled per request. The REST client stays as a fallback for the
         // window before the first topic message arrives.
-        CongestionTopicSubscriber subscriber = null;
-        try {
-            subscriber = new CongestionTopicSubscriber();
-        } catch (IllegalStateException e) {
-            System.err.println("[routing-service] " + e.getMessage()
-                    + " — falling back to REST polling of congestion-service");
-        }
+        CongestionTopicSubscriber subscriber = createSubscriber();
 
         Javalin app = Javalin.create().start(7023);
 
@@ -72,5 +66,16 @@ public class RoutingServiceApp {
                     "congestionLevel", level,
                     "estimatedMinutes", TravelTimeEstimator.estimate(start, end, level)));
         });
+    }
+
+    /** Returns a topic subscriber, or null (with a logged reason) when the broker is down. */
+    private static CongestionTopicSubscriber createSubscriber() {
+        try {
+            return new CongestionTopicSubscriber();
+        } catch (IllegalStateException e) {
+            System.err.println("[routing-service] " + e.getMessage()
+                    + " — falling back to REST polling of congestion-service");
+            return null;
+        }
     }
 }
